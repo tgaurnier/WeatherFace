@@ -1,0 +1,25 @@
+{
+	"uuid": "93ff0e26-20c3-4b98-a383-61df1d6c6ee7",
+	"shortName": "Weather Face",
+	"longName": "Weather Face",
+	"companyName": "Tory Gaurnier",
+	"versionCode": 1,
+	"versionLabel": "1.0.0",
+	"watchapp": { "watchface": true },
+	"capabilities": [ "location", "configurable" ],
+	"appKeys": {
+		"status": 0,
+		"city": 1,
+		"temp": 2,
+		"desc": 3
+	},
+	"resources": {
+		"media": [
+			{
+				"name": "MY_FONT_16",
+				"type": "font",
+				"file": "fonts/Ubuntu-B.ttf"
+			}
+		]
+	}
+}

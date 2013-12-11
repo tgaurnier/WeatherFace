@@ -1,0 +1,48 @@
+body {
+	text-align: center;
+	font-size: 1em;
+	font-family: sans-serif;
+	background-color: #999;
+	margin: 0px;
+	padding: 0px;
+}
+
+header {
+	padding: 1em;
+	background-color: #666;
+}
+h1 {
+	display: inline;
+	font-size: 2em;
+}
+
+form {
+	border: none;
+}
+
+fieldset {
+	border: none;
+}
+
+#unitSelect {
+}
+#unitSelect div {
+	width: 42%;
+	padding: 0.5em;
+	background-color: #696969
+}
+#celciusSelect {
+	float: left;
+}
+#fahrenheitSelect {
+	float: right;
+}
+
+radio {
+	width: 3em;
+}
+
+button {
+	width: 45%;
+	height: 3em;
+}
