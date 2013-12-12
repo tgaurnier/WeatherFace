@@ -4,7 +4,7 @@
  */
 
 
-var unit;
+var unit = window.localStorage.getItem("Unit") || "Celcius";
 
 
 function configClosed(e) {
@@ -13,7 +13,7 @@ function configClosed(e) {
 	if(e.response)
 		if(e.response != unit) {
 			unit = e.response;
-			localStorage.setItem("Unit", unit);
+			window.localStorage.setItem("Unit", unit);
 
 			Pebble.sendAppMessage({"status": "configUpdated"})
 		}
@@ -23,7 +23,6 @@ function configClosed(e) {
 
 
 function showConfigWindow(e) {
-	unit = localStorage.getItem("Unit") || "Celcius";
 	var url	=	"https://rawgithub.com/tgaurnier/WeatherFace/master/config_window/" +
 				"configuration.html?units" + "=" + unit;
 
@@ -34,11 +33,9 @@ function showConfigWindow(e) {
 
 function receivedHandler(message) {
 	if(message.payload.status == "retrieve") {
-		unit = localStorage.getItem("Unit") || "Celcius";
 		if(unit == "Celcius") format = "metric";
 		else format = "imperial";
 
-		console.log("Getting weather...\n");
 		navigator.geolocation.getCurrentPosition(
 			function(location) {
 				var req	=	new XMLHttpRequest();

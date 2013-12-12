@@ -93,7 +93,6 @@ static void tick_handle(struct tm *tick_time, TimeUnits units_changed) {
  * Message received
  */
 static void received_handler(DictionaryIterator *message, void *context) {
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved message\n");
 	char *status = (char*)dict_find(message, STATUS)->value;
 
 	if(strcmp(status, "ready") == 0) {
