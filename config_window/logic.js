@@ -5,8 +5,7 @@
 
 
 function cancel() {
-	alert("CLOSING");
-	window.location.href="pebblejs://close#";
+	document.location="pebblejs://close";
 }
 
 function submit() {
@@ -20,5 +19,5 @@ function submit() {
 	else if(fahrenheit.checked)
 		value = "Fahrenheit"
 
-	window.location.href = "pebblejs://close#" + value;
+	document.location = "pebblejs://close#" + value;
 }

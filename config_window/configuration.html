@@ -6,6 +6,7 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="stylesheet" type="text/css" href="style.css" />
+		<script type="text/javascript" src="logic.js"></script>
 	</head>
 	<body>
 		<header><h1>Weather Face Configuration</h1></header>
@@ -25,24 +26,5 @@
 				<button type="submit" id="submit" onclick="submit()">Submit</button>
 			</fieldset>
 		</div>
-		<script type="text/javascript">
-			function cancel() {
-				document.location="pebblejs://close";
-			}
-
-			function submit() {
-				var celcius		=	document.getElementById("unitsCelcius");
-				var fahrenheit	=	document.getElementById("unitsFahrenheit");
-				var value = "NULL";
-
-				if(celcius.checked)
-					value = "Celcius"
-
-				else if(fahrenheit.checked)
-					value = "Fahrenheit"
-
-				document.location = "pebblejs://close#" + value;
-			}
-		</script>
 	</body>
 </html>
