@@ -19,7 +19,7 @@ function setValues() {
 
 
 function cancel() {
-	alert("TEST");
+	console.log("TEST");
 	document.location="pebblejs://close#Cancelled";
 }
 
