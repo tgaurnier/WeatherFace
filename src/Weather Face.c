@@ -20,20 +20,20 @@
 
 #include <pebble.h>
 
-const uint16_t INTERVAL			=	15; // Minutes between weather checks
-const uint32_t INBOUND_SIZE		=	64; // Inbound app message size
-const uint32_t OUTBOUND_SIZE	=	64; // Outbound app message size
-const uint16_t SCREEN_WIDTH		=	144;
-const uint16_t SCREEN_HEIGHT	=	164;
+static const uint16_t INTERVAL		=	15; // Minutes between weather checks
+static const uint32_t INBOUND_SIZE	=	64; // Inbound app message size
+static const uint32_t OUTBOUND_SIZE	=	64; // Outbound app message size
+static const uint16_t SCREEN_WIDTH	=	144;
+static const uint16_t SCREEN_HEIGHT	=	164;
 
 static Window *window;
 static TextLayer *city_layer;
 static TextLayer *temp_layer;
 static TextLayer *desc_layer;
 
-char city_buff[50];
-char temp_buff[50];
-char desc_buff[50];
+static char city_buff[50];
+static char temp_buff[50];
+static char desc_buff[50];
 
 enum dict_keys {
 	STATUS,
@@ -46,7 +46,7 @@ enum dict_keys {
 /**
  * Outgoing message sent
  */
-void sent_handler(DictionaryIterator *sent, void *context) {
+static void sent_handler(DictionaryIterator *sent, void *context) {
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Message sent\n");
 }
 
@@ -54,7 +54,7 @@ void sent_handler(DictionaryIterator *sent, void *context) {
 /**
  * Outgoing message failed to send
  */
-void failed_handler(DictionaryIterator *failed, AppMessageResult reason, void *context) {
+static void failed_handler(DictionaryIterator *failed, AppMessageResult reason, void *context) {
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Failed to send message: %s\n", (char*)reason);
 }
 
@@ -62,7 +62,7 @@ void failed_handler(DictionaryIterator *failed, AppMessageResult reason, void *c
 /**
  * Send signal to Javascript to check the weather
  */
-void check_weather() {
+static void check_weather() {
 	DictionaryIterator *iter;
 	app_message_outbox_begin(&iter);
 
@@ -76,7 +76,7 @@ void check_weather() {
 /**
  * Check weather every INTERVAL minutes
  */
-void tick_handle(struct tm *tick_time, TimeUnits units_changed) {
+static void tick_handle(struct tm *tick_time, TimeUnits units_changed) {
 	static unsigned short count = 1;
 
 	if(count == INTERVAL) {
@@ -92,7 +92,8 @@ void tick_handle(struct tm *tick_time, TimeUnits units_changed) {
 /**
  * Message received
  */
-void received_handler(DictionaryIterator *message, void *context) {
+static void received_handler(DictionaryIterator *message, void *context) {
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved message\n");
 	char *status = (char*)dict_find(message, STATUS)->value;
 
 	if(strcmp(status, "ready") == 0) {
@@ -121,7 +122,7 @@ void received_handler(DictionaryIterator *message, void *context) {
 /**
  * Failed to receive message
  */
-void dropped_handler(AppMessageResult reason, void *context) {
+static void dropped_handler(AppMessageResult reason, void *context) {
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Message dropped: %s\n", (char*)reason);
 }
 
