@@ -4,7 +4,7 @@
  */
 
 
-var unit = window.localStorage.getItem("Unit") || "Celcius";
+var unit;
 
 
 function configClosed(e) {
@@ -13,7 +13,7 @@ function configClosed(e) {
 	if(e.response)
 		if(e.response != unit) {
 			unit = e.response;
-			window.localStorage.setItem("Unit", unit);
+			localStorage.setItem("Unit", unit);
 
 			Pebble.sendAppMessage({"status": "configUpdated"})
 		}
@@ -33,13 +33,17 @@ function showConfigWindow(e) {
 
 function receivedHandler(message) {
 	if(message.payload.status == "retrieve") {
+		unit = localStorage.getItem("Unit") || "Celcius";
+		if(unit == "Celcius") format = "metric";
+		else format = "imperial";
+
 		console.log("Getting weather...\n");
 		navigator.geolocation.getCurrentPosition(
 			function(location) {
 				var req	=	new XMLHttpRequest();
 				var url	=	"http://api.openweathermap.org/data/2.5/weather?lat=" +
 							location.coords.latitude + "&lon=" + location.coords.longitude +
-							"&units=imperial&appid=9da7aa4c37d50f0595f5d457fcfa3327";
+							"&units=" + format + "&appid=9da7aa4c37d50f0595f5d457fcfa3327";
 
 				req.open("GET", url, true);
 				req.onload = function(e) {

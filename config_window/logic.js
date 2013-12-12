@@ -19,5 +19,5 @@ function submit() {
 	else if(fahrenheit.checked)
 		value = "Fahrenheit"
 
-	window.location.href="pebblejs://close#" + value;
+	window.location.href = "pebblejs://close#" + value;
 }
