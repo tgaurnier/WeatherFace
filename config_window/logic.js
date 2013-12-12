@@ -4,9 +4,24 @@
  */
 
 
+function getQueryString(key) {
+	var key		=	key.replace(/[\[]/,"\\\[").replace(/[\]]/,"\\\]");
+	var regex	=	new RegExp("[\\?&]" + key + "=([^&#]*)");
+	var value	=	regex.exec(window.location.href);
+    return value[1];
+}
+
+
+function setValues() {
+	value = getQueryString("units");
+	if(value) document.getElementById("units" + value).checked = "checked";
+}
+
+
 function cancel() {
 	document.location="pebblejs://close#Cancelled";
 }
+
 
 function submit() {
 	var celcius		=	document.getElementById("unitsCelcius");
