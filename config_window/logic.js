@@ -14,12 +14,11 @@ function getQueryString(key) {
 
 function setValues() {
 	value = getQueryString("units");
-	if(value) document.getElementById("units" + value).checked = "checked";
+	if(value) document.getElementById("units" + value).checked = true;
 }
 
 
 function cancel() {
-	console.log("TEST");
 	document.location="pebblejs://close#Cancelled";
 }
 
