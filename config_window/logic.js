@@ -5,7 +5,7 @@
 
 
 function cancel() {
-	document.location="pebblejs://close#";
+	document.location="pebblejs://close#Cancelled";
 }
 
 function submit() {

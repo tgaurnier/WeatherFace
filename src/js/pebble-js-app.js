@@ -10,7 +10,7 @@ var unit = window.localStorage.getItem("Unit") || "Celcius";
 function configClosed(e) {
 	console.log("Configuration window returned: " + e.response);
 
-	if(e.response)
+	if(e.response && e.response != "Cancelled")
 		if(e.response != unit) {
 			unit = e.response;
 			window.localStorage.setItem("Unit", unit);
