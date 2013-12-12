@@ -9,7 +9,7 @@
 	</head>
 	<body>
 		<header><h1>Weather Face Configuration</h1></header>
-		<form>
+		<div>
 			<fieldset id="unitSelect">
 				<div id="celciusSelect">
 					<label for="unitsCelcius">Celcius</label>
@@ -21,10 +21,10 @@
 				</div>
 			</fieldset>
 			<fieldset id="actionArea">
-				<button type="button" id="cancel" onclick="cancel()">Cancel</button>
-				<button type="button" id="submit" onclick="submit()">Submit</button>
+				<button type="submit" id="cancel" onClick="cancel()">Cancel</button>
+				<button type="submit" id="submit" onclick="submit()">Submit</button>
 			</fieldset>
-		</form>
+		</div>
 		<script type="text/javascript">
 			function cancel() {
 				document.location="pebblejs://close";
