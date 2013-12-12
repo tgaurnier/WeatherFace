@@ -6,7 +6,6 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="stylesheet" type="text/css" href="style.css" />
-		<script type="text/javascript" src="logic.js"></script>
 	</head>
 	<body>
 		<header><h1>Weather Face Configuration</h1></header>
@@ -22,9 +21,29 @@
 				</div>
 			</fieldset>
 			<fieldset id="actionArea">
-				<button type="submit" id="cancel" onClicked="alert('TEST1');cancel();">Cancel</button>
+				<button type="submit" id="cancel" onClicked="cancel()">Cancel</button>
 				<button type="submit" id="submit" onClicked="submit()">Submit</button>
 			</fieldset>
 		</form>
+		<script type="text/javascript">
+			function cancel() {
+				alert("CLOSING");
+				window.location.href="pebblejs://close#";
+			}
+
+			function submit() {
+				var celcius		=	document.getElementById("unitsCelcius");
+				var fahrenheit	=	document.getElementById("unitsFahrenheit");
+				var value = "NULL";
+
+				if(celcius.checked)
+					value = "Celcius"
+
+				else if(fahrenheit.checked)
+					value = "Fahrenheit"
+
+				window.location.href = "pebblejs://close#" + value;
+			}
+		</script>
 	</body>
 </html>
