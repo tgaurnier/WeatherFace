@@ -21,14 +21,13 @@
 				</div>
 			</fieldset>
 			<fieldset id="actionArea">
-				<button type="submit" id="cancel" onClicked="document.location = 'pebblejs://close'">Cancel</button>
-				<button type="submit" id="submit" onClicked="submit()">Submit</button>
+				<button type="submit" id="cancel" onClick="cancel()">Cancel</button>
+				<button type="submit" id="submit" onClick="submit()">Submit</button>
 			</fieldset>
 		</form>
 		<script type="text/javascript">
 			function cancel() {
-				alert("CLOSING");
-				document.location = "pebblejs://close#";
+				window.location.href="pebblejs://close#";
 			}
 
 			function submit() {
@@ -42,7 +41,7 @@
 				else if(fahrenheit.checked)
 					value = "Fahrenheit"
 
-				document.location = "pebblejs://close#" + value;
+				window.location.href = "pebblejs://close#" + value;
 			}
 		</script>
 	</body>
