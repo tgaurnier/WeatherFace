@@ -23,6 +23,7 @@ function configClosed(e) {
 
 
 function showConfigWindow(e) {
+	unit = localStorage.getItem("Unit") || "Celcius";
 	var url	=	"https://rawgithub.com/tgaurnier/WeatherFace/master/config_window/" +
 				"configuration.html?units" + "=" + unit;
 

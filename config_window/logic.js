@@ -5,6 +5,7 @@
 
 
 function cancel() {
+	alert("CLOSING");
 	window.location.href="pebblejs://close#";
 }
 
