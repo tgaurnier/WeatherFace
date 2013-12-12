@@ -8,7 +8,7 @@
 		<link rel="stylesheet" type="text/css" href="style.css" />
 		<script type="text/javascript" src="logic.js"></script>
 	</head>
-	<body>
+	<body onload="setValues()">
 		<header><h1>Weather Face Configuration</h1></header>
 		<div>
 			<fieldset id="unitSelect">
@@ -22,7 +22,7 @@
 				</div>
 			</fieldset>
 			<fieldset id="actionArea">
-				<button type="submit" id="cancel" onClick="cancel()">Cancel</button>
+				<button type="submit" id="cancel" onclick="cancel()">Cancel</button>
 				<button type="submit" id="submit" onclick="submit()">Submit</button>
 			</fieldset>
 		</div>
