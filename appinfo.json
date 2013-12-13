@@ -11,14 +11,81 @@
 		"status": 0,
 		"city": 1,
 		"temp": 2,
-		"desc": 3
+		"desc": 3,
+		"icon": 4
 	},
 	"resources": {
 		"media": [
 			{
-				"name": "MY_FONT_16",
+				"name": "FONT_16",
 				"type": "font",
 				"file": "fonts/Ubuntu-B.ttf"
+			},
+			{
+				"name": "FONT_20",
+				"type": "font",
+				"file": "fonts/Ubuntu-B.ttf"
+			},
+			{
+				"name": "ICON",
+				"type": "png",
+				"file": "images/icon.png",
+				"menuIcon": true
+			},
+			{
+				"name": "CLEAR_DAY",
+				"type": "png",
+				"file": "images/clear_day.png"
+			},
+			{
+				"name": "CLEAR_NIGHT",
+				"type": "png",
+				"file": "images/clear_night.png"
+			},
+			{
+				"name": "CLOUDS",
+				"type": "png",
+				"file": "images/clouds.png"
+			},
+			{
+				"name": "FEW_CLOUDS_DAY",
+				"type": "png",
+				"file": "images/few_clouds_day.png"
+			},
+			{
+				"name": "FEW_CLOUDS_NIGHT",
+				"type": "png",
+				"file": "images/few_clouds_night.png"
+			},
+			{
+				"name": "MIST",
+				"type": "png",
+				"file": "images/mist.png"
+			},
+			{
+				"name": "RAIN",
+				"type": "png",
+				"file": "images/rain.png"
+			},
+			{
+				"name": "SCATTERED_CLOUDS_DAY",
+				"type": "png",
+				"file": "images/scattered_clouds_day.png"
+			},
+			{
+				"name": "SCATTERED_CLOUDS_NIGHT",
+				"type": "png",
+				"file": "images/scattered_clouds_night.png"
+			},
+			{
+				"name": "SNOW",
+				"type": "png",
+				"file": "images/snow.png"
+			},
+			{
+				"name": "THUNDERSTORM",
+				"type": "png",
+				"file": "images/thunderstorm.png"
 			}
 		]
 	}

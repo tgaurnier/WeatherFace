@@ -34,11 +34,14 @@ function showConfigWindow(e) {
 
 function receivedHandler(message) {
 	if(message.payload.status == "retrieve") {
+		console.log("Recieved status \"retrieve\"")
 		if(unit == "Celcius") format = "metric";
 		else format = "imperial";
 
+		console.log("Getting location...");
 		navigator.geolocation.getCurrentPosition(
 			function(location) {
+				console.log("Getting weather...");
 				var req	=	new XMLHttpRequest();
 				var url	=	"http://api.openweathermap.org/data/2.5/weather?lat=" +
 							location.coords.latitude + "&lon=" + location.coords.longitude +
@@ -50,14 +53,21 @@ function receivedHandler(message) {
 						var response	=	JSON.parse(req.responseText);
 						var city		=	"" + response.name; // Make sure these are strings
 						var temp		= 	"" + response.main.temp + " \u00B0" + unit[0];
-						var	desc		=	"" + response.weather[0].main;
+						var	desc		=	"" + response.weather[0].description;
+						var icon		=	"" + response.weather[0].icon;
 
+						console.log("Submitting weather...");
 						Pebble.sendAppMessage(
 							{
 								"status": "reporting",
 								"city": city,
 								"temp": temp,
-								"desc": desc
+								"desc": desc,
+								"icon": icon
+							},
+							function(e){},
+							function(e) {
+								console.log("Error sending message: " + e.error.message);
 							}
 						);
 					}

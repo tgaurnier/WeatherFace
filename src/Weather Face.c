@@ -20,26 +20,36 @@
 
 #include <pebble.h>
 
-static const uint16_t INTERVAL		=	15; // Minutes between weather checks
-static const uint32_t INBOUND_SIZE	=	64; // Inbound app message size
-static const uint32_t OUTBOUND_SIZE	=	64; // Outbound app message size
-static const uint16_t SCREEN_WIDTH	=	144;
-static const uint16_t SCREEN_HEIGHT	=	164;
+static const uint32_t INBOUND_SIZE		=	128; // Inbound app message size
+static const uint32_t OUTBOUND_SIZE		=	128; // Outbound app message size
+static const uint16_t INTERVAL			=	15; // Minutes between weather checks
+static const uint16_t PADDING_LEFT		=	0; // Padding for left of screen
+static const uint16_t PADDING_RIGHT		=	0; // Padding for right of screen
+static const uint16_t PADDING_TOP		=	10; // Padding for top of screen
+static const uint16_t PADDING_BOTTOM	=	10; // Padding for bottom of screen
+static const uint16_t SCR_W				=	144; // Screen width
+static const uint16_t SCR_H				=	168; // Screen height
 
 static Window *window;
 static TextLayer *city_layer;
 static TextLayer *temp_layer;
 static TextLayer *desc_layer;
+static BitmapLayer *icon_layer;
+static GBitmap *icon = NULL;
+static GFont font_small;
+static GFont font_large;
 
 static char city_buff[50];
 static char temp_buff[50];
 static char desc_buff[50];
+static char icon_buff[50];
 
 enum dict_keys {
 	STATUS,
 	CITY,
 	TEMP,
-	DESC
+	DESC,
+	ICON
 };
 
 
@@ -47,7 +57,7 @@ enum dict_keys {
  * Outgoing message sent
  */
 static void sent_handler(DictionaryIterator *sent, void *context) {
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Message sent\n");
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Message sent");
 }
 
 
@@ -55,7 +65,7 @@ static void sent_handler(DictionaryIterator *sent, void *context) {
  * Outgoing message failed to send
  */
 static void failed_handler(DictionaryIterator *failed, AppMessageResult reason, void *context) {
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Failed to send message: %s\n", (char*)reason);
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Failed to send message: %s", (char*)reason);
 }
 
 
@@ -96,25 +106,77 @@ static void received_handler(DictionaryIterator *message, void *context) {
 	char *status = (char*)dict_find(message, STATUS)->value;
 
 	if(strcmp(status, "ready") == 0) {
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved status \"ready\"\n");
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved status \"ready\"");
+
 		check_weather();
 		tick_timer_service_subscribe(MINUTE_UNIT, &tick_handle);
 	}
 
 	else if(strcmp(status, "reporting") == 0) {
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved status \"reporting\"\n");
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved status \"reporting\"");
 
+		// Get values from dictionary
 		strcpy(city_buff, (char*)dict_find(message, CITY)->value);
 		strcpy(temp_buff, (char*)dict_find(message, TEMP)->value);
 		strcpy(desc_buff, (char*)dict_find(message, DESC)->value);
+		strcpy(icon_buff, (char*)dict_find(message, ICON)->value);
 
+		// Set text layers
 		text_layer_set_text(city_layer, city_buff);
 		text_layer_set_text(temp_layer, temp_buff);
 		text_layer_set_text(desc_layer, desc_buff);
+
+		// If icon is already set, free it first
+		if(icon != NULL)
+			gbitmap_destroy(icon);
+
+		// Set appropriate icon based on icon code
+		if(strcmp(icon_buff, "01d") == 0)
+			icon = gbitmap_create_with_resource(RESOURCE_ID_CLEAR_DAY);
+
+		else if(strcmp(icon_buff, "01n") == 0)
+			icon = gbitmap_create_with_resource(RESOURCE_ID_CLEAR_NIGHT);
+
+		else if(strcmp(icon_buff, "02d") == 0)
+			icon = gbitmap_create_with_resource(RESOURCE_ID_FEW_CLOUDS_DAY);
+
+		else if(strcmp(icon_buff, "02n") == 0)
+			icon = gbitmap_create_with_resource(RESOURCE_ID_FEW_CLOUDS_NIGHT);
+
+		else if(strcmp(icon_buff, "03d") == 0 || strcmp(icon_buff, "04d") == 0)
+			icon = gbitmap_create_with_resource(RESOURCE_ID_SCATTERED_CLOUDS_DAY);
+
+		else if(strcmp(icon_buff, "03n") == 0 || strcmp(icon_buff, "04n") == 0)
+			icon = gbitmap_create_with_resource(RESOURCE_ID_SCATTERED_CLOUDS_NIGHT);
+
+		else if(strcmp(icon_buff, "09d") == 0 || strcmp(icon_buff, "09n") == 0 ||
+				strcmp(icon_buff, "10d") == 0 || strcmp(icon_buff, "10n") == 0)
+			icon = gbitmap_create_with_resource(RESOURCE_ID_RAIN);
+
+		else if(strcmp(icon_buff, "11d") == 0 || strcmp(icon_buff, "11n") == 0)
+			icon = gbitmap_create_with_resource(RESOURCE_ID_THUNDERSTORM);
+
+		else if(strcmp(icon_buff, "13d") == 0 || strcmp(icon_buff, "13n") == 0)
+			icon = gbitmap_create_with_resource(RESOURCE_ID_SNOW);
+
+		else if(strcmp(icon_buff, "50d") == 0 || strcmp(icon_buff, "50n") == 0)
+			icon = gbitmap_create_with_resource(RESOURCE_ID_MIST);
+
+		else {
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Can't find icon: %s", icon_buff);
+			icon = NULL;
+		}
+
+		// Set icon (as long as it's not NULL)
+		if(icon != NULL)
+			bitmap_layer_set_bitmap(icon_layer, icon);
 	}
 
-	else if(strcmp(status, "configUpdated") == 0)
+	else if(strcmp(status, "configUpdated") == 0) {
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved status \"configUpdate\"");
+
 		check_weather();
+	}
 }
 
 
@@ -122,42 +184,80 @@ static void received_handler(DictionaryIterator *message, void *context) {
  * Failed to receive message
  */
 static void dropped_handler(AppMessageResult reason, void *context) {
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Message dropped: %s\n", (char*)reason);
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Message dropped: %s", (char*)reason);
 }
 
 
 static void init(void) {
-	GFont font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_MY_FONT_16));
+	// Init fonts
+	font_small = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_16));
+	font_large = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_20));
+
 
 	// Init window
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing window");
 	window = window_create();
-	window_stack_push(window, true);
 	window_set_background_color(window, GColorBlack);
+	window_stack_push(window, true);
 	Layer *root_layer = window_get_root_layer(window);
 	GRect frame = layer_get_frame(root_layer);
 
 	// Init city_layer
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing city layer");
+	uint16_t city_w	=	SCR_W - (PADDING_LEFT + PADDING_RIGHT);
+	uint16_t city_h	=	40;
+	uint16_t city_x	=	PADDING_LEFT;
+	uint16_t city_y	=	PADDING_TOP;
 	city_layer = text_layer_create(frame);
-	layer_set_frame((Layer*)city_layer, GRect(0, 0, SCREEN_WIDTH, 20));
+	text_layer_set_font(city_layer, font_large);
 	text_layer_set_text_alignment(city_layer, GTextAlignmentCenter);
-	text_layer_set_font(city_layer, font);
+	text_layer_set_text_color(city_layer, GColorWhite);
+	text_layer_set_background_color(city_layer, GColorBlack);
+	layer_set_frame(text_layer_get_layer(city_layer), GRect(city_x, city_y, city_w, city_h));
 	layer_add_child(root_layer, text_layer_get_layer(city_layer));
 
-	// Init temp_layer
-	temp_layer = text_layer_create(frame);
-	layer_set_frame((Layer*)temp_layer, GRect(0, SCREEN_HEIGHT - 60, SCREEN_WIDTH, 20));
-	text_layer_set_text_alignment(temp_layer, GTextAlignmentCenter);
-	text_layer_set_font(temp_layer, font);
-	layer_add_child(root_layer, text_layer_get_layer(temp_layer));
-
 	// Init desc_layer
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing description layer");
+	uint16_t desc_w	=	SCR_W - (PADDING_LEFT + PADDING_RIGHT);
+	uint16_t desc_h	=	20;
+	uint16_t desc_x	=	PADDING_LEFT;
+	uint16_t desc_y	=	SCR_H - (desc_h + PADDING_TOP);
 	desc_layer = text_layer_create(frame);
-	layer_set_frame((Layer*)desc_layer, GRect(0, SCREEN_HEIGHT - 30, SCREEN_WIDTH, 20));
+	text_layer_set_font(desc_layer, font_small);
 	text_layer_set_text_alignment(desc_layer, GTextAlignmentCenter);
-	text_layer_set_font(temp_layer, font);
+	text_layer_set_text_color(desc_layer, GColorWhite);
+	text_layer_set_background_color(desc_layer, GColorBlack);
+	layer_set_frame(text_layer_get_layer(desc_layer), GRect(desc_x, desc_y, desc_w, desc_h));
 	layer_add_child(root_layer, text_layer_get_layer(desc_layer));
 
+	// Init temp_layer
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing temperature layer");
+	uint16_t temp_w	=	SCR_W - (PADDING_LEFT + PADDING_RIGHT);
+	uint16_t temp_h	=	20;
+	uint16_t temp_x	=	PADDING_LEFT;
+	uint16_t temp_y	=	SCR_H - (desc_h + temp_h + PADDING_TOP);
+	temp_layer = text_layer_create(frame);
+	text_layer_set_font(temp_layer, font_small);
+	text_layer_set_text_alignment(temp_layer, GTextAlignmentCenter);
+	text_layer_set_text_color(temp_layer, GColorWhite);
+	text_layer_set_background_color(temp_layer, GColorBlack);
+	layer_set_frame(text_layer_get_layer(temp_layer), GRect(temp_x, temp_y, temp_w, temp_h));
+	layer_add_child(root_layer, text_layer_get_layer(temp_layer));
+
+	// Init icon_layer
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing icon layer");
+	uint16_t icon_w	=	SCR_W - (PADDING_LEFT + PADDING_RIGHT);
+	uint16_t icon_h	=	SCR_H - (city_h + temp_h + desc_h + PADDING_TOP);
+	uint16_t icon_x	=	PADDING_LEFT;
+	uint16_t icon_y	=	city_h;
+	icon_layer = bitmap_layer_create(frame);
+	bitmap_layer_set_background_color(icon_layer, GColorBlack);
+	bitmap_layer_set_alignment(icon_layer, GAlignTop);
+	layer_set_frame(bitmap_layer_get_layer(icon_layer), GRect(icon_x, icon_y, icon_w, icon_h));
+	layer_add_child(root_layer, bitmap_layer_get_layer(icon_layer));
+
 	// Init app message and message handlers
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing handlers");
 	app_message_register_outbox_sent(sent_handler);
 	app_message_register_outbox_failed(failed_handler);
 	app_message_register_inbox_received(received_handler);
@@ -165,11 +265,19 @@ static void init(void) {
 	app_message_open(INBOUND_SIZE, OUTBOUND_SIZE);
 
 	text_layer_set_text(city_layer, "loading...");
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Finished initializing");
 }
 
 
 static void deinit(void) {
 	text_layer_destroy(city_layer);
+	text_layer_destroy(temp_layer);
+	text_layer_destroy(desc_layer);
+	bitmap_layer_destroy(icon_layer);
+	fonts_unload_custom_font(font_small);
+	fonts_unload_custom_font(font_large);
+	if(icon != NULL)
+		gbitmap_destroy(icon);
 	window_destroy(window);
 }
 
