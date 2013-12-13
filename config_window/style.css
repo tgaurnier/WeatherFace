@@ -27,7 +27,7 @@ fieldset {
 	padding: 0.5em;
 	background-color: #696969
 }
-#celciusSelect {
+#celsiusSelect {
 	float: left;
 }
 #fahrenheitSelect {

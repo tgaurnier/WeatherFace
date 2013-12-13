@@ -24,12 +24,12 @@ function cancel() {
 
 
 function submit() {
-	var celcius		=	document.getElementById("unitsCelcius");
+	var celsius		=	document.getElementById("unitsCelsius");
 	var fahrenheit	=	document.getElementById("unitsFahrenheit");
 	var value = "NULL";
 
-	if(celcius.checked)
-		value = "Celcius"
+	if(celsius.checked)
+		value = "Celsius"
 
 	else if(fahrenheit.checked)
 		value = "Fahrenheit"

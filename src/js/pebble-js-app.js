@@ -4,7 +4,7 @@
  */
 
 
-var unit = window.localStorage.getItem("Unit") || "Celcius";
+var unit = window.localStorage.getItem("Unit") || "Celsius";
 
 
 function configClosed(e) {
@@ -35,7 +35,7 @@ function showConfigWindow(e) {
 function receivedHandler(message) {
 	if(message.payload.status == "retrieve") {
 		console.log("Recieved status \"retrieve\"")
-		if(unit == "Celcius") format = "metric";
+		if(unit == "Celsius") format = "metric";
 		else format = "imperial";
 
 		console.log("Getting location...");
