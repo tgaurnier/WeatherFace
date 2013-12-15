@@ -48,6 +48,8 @@ static uint16_t padding_right	=	3; // Padding for right of screen
 static uint16_t padding_top		=	6; // Padding for top of screen
 static uint16_t padding_bottom	=	6; // Padding for bottom of screen
 static bool ready				=	false; // Is PebbleKit ready?
+static bool tick_timer_started	=	false; // Has the tick timer been started yet?
+static time_t last_tick_time	=	0; // Last time tick_handler ran
 
 static char city_buff[100]	=	"\0";
 static char temp_buff[50]	=	"\0";
@@ -325,7 +327,8 @@ static void received_handler(DictionaryIterator *message, void *context) {
 	if(strcmp(status, "ready") == 0) {
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved status \"ready\"");
 		ready = true;
-		if(time_to_refresh()) get_weather();
+		if(time_to_refresh() && tick_timer_started && time(NULL) - last_tick_time >= 30)
+			get_weather();
 	}
 
 	else if(strcmp(status, "reporting") == 0) {
@@ -369,6 +372,13 @@ static void dropped_handler(AppMessageResult reason, void *context) {
  * Check weather every INTERVAL minutes
  */
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
+	last_tick_time = time(NULL);
+
+	if(!tick_timer_started) {
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Tick timer started");
+		tick_timer_started = true;
+	}
+
 	if(time_to_refresh() && ready)
 		get_weather();
 }
