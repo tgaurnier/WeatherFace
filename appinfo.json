@@ -4,7 +4,7 @@
 	"longName": "Weather Face",
 	"companyName": "Tory Gaurnier",
 	"versionCode": 1,
-	"versionLabel": "1.0.2",
+	"versionLabel": "1.0.3",
 	"watchapp": { "watchface": true },
 	"capabilities": [ "location", "configurable" ],
 	"appKeys": {
@@ -41,6 +41,26 @@
 				"type": "png",
 				"file": "images/icon.png",
 				"menuIcon": true
+			},
+			{
+				"name": "REFRESH",
+				"type": "png",
+				"file": "images/refresh.png"
+			},
+			{
+				"name": "WARNING",
+				"type": "png",
+				"file": "images/warning.png"
+			},
+			{
+				"name": "WAITING",
+				"type": "png",
+				"file": "images/waiting.png"
+			},
+			{
+				"name": "EMPTY",
+				"type": "png",
+				"file": "images/empty.png"
 			},
 			{
 				"name": "CLEAR_DAY",

@@ -68,13 +68,20 @@ function receivedHandler(message) {
 						);
 					}
 
-					else console.log("Error communicating with Open Weather Map");
+					else {
+						console.log("Error communicating with Open Weather Map");
+						Pebble.sendAppMessage({"status": "failed"});
+					}
 				}
 
 				req.send(null);
 			},
 			function(error) {
 				console.log("Failed to get coords: " + error.message + "\n");
+				Pebble.sendAppMessage({"status": "failed"});
+			},
+			{
+				timeout: 60000
 			}
 		);
 	}

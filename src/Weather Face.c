@@ -21,6 +21,7 @@
 #include <pebble.h>
 
 static const time_t INTERVAL		=	15 * 60; // Seconds between weather checks
+static const time_t ERROR_TIMEOUT	=	120; // Wait time after error before retrying get_weather
 static const uint32_t INBOUND_SIZE	=	128; // Inbound app message size
 static const uint32_t OUTBOUND_SIZE	=	128; // Outbound app message size
 static const uint16_t SCR_W			=	144; // Screen width
@@ -31,14 +32,19 @@ static TextLayer *city_layer;
 static TextLayer *temp_layer;
 static TextLayer *desc_layer;
 static BitmapLayer *icon_layer;
-static GBitmap *icon = NULL;
+static BitmapLayer *noti_layer;
 static GFont font_tiny;
 static GFont font_small;
 static GFont font_medium;
 static GFont font_large;
+static GBitmap *icon	=	NULL;
+static GBitmap *refresh	=	NULL;
+static GBitmap *warning	=	NULL;
+static GBitmap *waiting	=	NULL;
+static GBitmap *empty	=	NULL;
 
-static uint16_t padding_left	=	0; // Padding for left of screen
-static uint16_t padding_right	=	0; // Padding for right of screen
+static uint16_t padding_left	=	3; // Padding for left of screen
+static uint16_t padding_right	=	3; // Padding for right of screen
 static uint16_t padding_top		=	6; // Padding for top of screen
 static uint16_t padding_bottom	=	6; // Padding for bottom of screen
 static bool ready				=	false; // Is PebbleKit ready?
@@ -59,28 +65,15 @@ enum dict_keys {
 };
 
 
-static bool time_to_refresh();
-static void set_layer_frames();
-static void set_layer_values();
-static void save_data();
-static void load_data();
-static void check_weather();
-static void sent_handler(DictionaryIterator *sent, void *context);
-static void failed_handler(DictionaryIterator *failed, AppMessageResult reason, void *context);
-static void received_handler(DictionaryIterator *message, void *context);
-static void dropped_handler(AppMessageResult reason, void *context);
-static void tick_handler(struct tm *tick_time, TimeUnits units_changed);
-
-
 /**
  * Compare time stamp of last refresh to current time, if INTERVAL has been reached return true, if
  * not, or no time stamp exists, then return false
  */
 static bool time_to_refresh() {
 	time_t time_passed = time(NULL) - time_stamp;
-
 	if(time_stamp == 0 || time_passed >= INTERVAL) {
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Time to refresh");
+		bitmap_layer_set_bitmap(noti_layer, waiting);
 		return true;
 	}
 
@@ -122,10 +115,21 @@ static void set_layer_frames() {
 	uint16_t icon_x	=	padding_left;
 	uint16_t icon_y	=	city_h;
 
+	uint16_t noti_w	=	20;
+	uint16_t noti_h	=	20;
+	uint16_t noti_x	=	SCR_W - (noti_w + padding_right);
+	uint16_t noti_y	=	SCR_H - (noti_h + padding_bottom);
+
 	layer_set_frame(text_layer_get_layer(city_layer), GRect(city_x, city_y, city_w, city_h));
+	layer_set_bounds(text_layer_get_layer(city_layer), GRect(0, 0, city_w, city_h));
 	layer_set_frame(text_layer_get_layer(desc_layer), GRect(desc_x, desc_y, desc_w, desc_h));
+	layer_set_bounds(text_layer_get_layer(desc_layer), GRect(0, 0, desc_w, desc_h));
 	layer_set_frame(text_layer_get_layer(temp_layer), GRect(temp_x, temp_y, temp_w, temp_h));
+	layer_set_bounds(text_layer_get_layer(temp_layer), GRect(0, 0, temp_w, temp_h));
 	layer_set_frame(bitmap_layer_get_layer(icon_layer), GRect(icon_x, icon_y, icon_w, icon_h));
+	layer_set_bounds(bitmap_layer_get_layer(icon_layer), GRect(0, 0, icon_w, icon_h));
+	layer_set_frame(bitmap_layer_get_layer(noti_layer), GRect(noti_x, noti_y, noti_w, noti_h));
+	layer_set_bounds(bitmap_layer_get_layer(noti_layer), GRect(0, 0, noti_w, noti_h));
 }
 
 
@@ -203,23 +207,51 @@ static void set_layer_values() {
 		bitmap_layer_set_bitmap(icon_layer, icon);
 }
 
+/**
+ * Returns true if all data in buffs have values
+ * If any values are empty returns false
+ */
+static bool data_to_save() {
+	return (
+		city_buff[0] != '\0' &&
+		temp_buff[0] != '\0' &&
+		desc_buff[0] != '\0' &&
+		icon_buff[0] != '\0' &&
+		time_stamp != 0
+	);
+}
+
+/**
+ * Returns true if all data in persistent storage have values
+ * If any values are empty returns false
+ */
+static bool data_to_load() {
+	return (
+		persist_exists(CITY) &&
+		persist_exists(TEMP) &&
+		persist_exists(DESC) &&
+		persist_exists(ICON) &&
+		persist_exists(TIME)
+	);
+}
+
 
 /**
  * Save data to persistent storage
  */
 static void save_data() {
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Saving data to persistent storage");
+	if(data_to_save()) {
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Saving data to persistent storage");
 
-	persist_delete(CITY);
-	persist_write_string(CITY, city_buff);
-	persist_delete(TEMP);
-	persist_write_string(TEMP, temp_buff);
-	persist_delete(DESC);
-	persist_write_string(DESC, desc_buff);
-	persist_delete(ICON);
-	persist_write_string(ICON, icon_buff);
-	persist_delete(TIME);
-	persist_write_int(TIME, (int)time_stamp);
+		persist_write_string(CITY, city_buff);
+		persist_write_string(TEMP, temp_buff);
+		persist_write_string(DESC, desc_buff);
+		persist_write_string(ICON, icon_buff);
+		persist_write_int(TIME, (int)time_stamp);
+	}
+
+	else
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Some or all buffs are empty, not saving");
 }
 
 
@@ -227,21 +259,22 @@ static void save_data() {
  * Load data from persistent storage
  */
 static void load_data() {
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Loading data from persistent storage");
-
 	// If data saved, then load it
-	if(persist_exists(CITY) && persist_exists(TEMP) && persist_exists(DESC) &&
-			persist_exists(ICON) && persist_exists(TIME)) {
+	if(data_to_load()) {
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Loading data from persistent storage");
+
 		persist_read_string(CITY, city_buff, 100);
 		persist_read_string(TEMP, temp_buff, 50);
 		persist_read_string(DESC, desc_buff, 50);
 		persist_read_string(ICON, icon_buff, 50);
 		time_stamp = (time_t)persist_read_int(TIME);
+
 		set_layer_values();
 	}
 
 	// Else set text to "loading..." and set layer frames
 	else {
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Some or all save data is empty, not loading");
 		text_layer_set_text(city_layer, "loading...");
 		set_layer_frames();
 	}
@@ -251,7 +284,12 @@ static void load_data() {
 /**
  * Send signal to Javascript to check the weather
  */
-static void check_weather() {
+static void get_weather() {
+	// Reset time_stamp back to INTERVAL to avoid simultanious runs of get_weather
+	time_stamp = time(NULL) - INTERVAL;
+
+	bitmap_layer_set_bitmap(noti_layer, refresh);
+
 	DictionaryIterator *iter;
 	app_message_outbox_begin(&iter);
 
@@ -287,10 +325,14 @@ static void received_handler(DictionaryIterator *message, void *context) {
 	if(strcmp(status, "ready") == 0) {
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved status \"ready\"");
 		ready = true;
+		if(time_to_refresh()) get_weather();
 	}
 
 	else if(strcmp(status, "reporting") == 0) {
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved status \"reporting\"");
+
+		// Set notification area to empty bitmap
+		bitmap_layer_set_bitmap(noti_layer, empty);
 
 		// Get values from dictionary
 		strcpy(city_buff, (char*)dict_find(message, CITY)->value);
@@ -299,14 +341,18 @@ static void received_handler(DictionaryIterator *message, void *context) {
 		strcpy(icon_buff, (char*)dict_find(message, ICON)->value);
 
 		time_stamp = time(NULL);
-		save_data();
 		set_layer_values();
 	}
 
 	else if(strcmp(status, "configUpdated") == 0) {
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved status \"configUpdate\"");
 
-		check_weather();
+		get_weather();
+	}
+
+	else if(strcmp(status, "failed") == 0) {
+		bitmap_layer_set_bitmap(noti_layer, warning);
+		time_stamp = time(NULL) - (INTERVAL - ERROR_TIMEOUT);
 	}
 }
 
@@ -323,20 +369,25 @@ static void dropped_handler(AppMessageResult reason, void *context) {
  * Check weather every INTERVAL minutes
  */
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-	if(time_to_refresh() && ready) {
-		time_stamp = 0; // Set time_stamp back to 0 to avoid simultanious runs of check_weather
-		check_weather();
-	}
+	if(time_to_refresh() && ready)
+		get_weather();
 }
 
 
 static void init(void) {
+	// Init notification icons
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing notification icons");
+	refresh	=	gbitmap_create_with_resource(RESOURCE_ID_REFRESH);
+	warning	=	gbitmap_create_with_resource(RESOURCE_ID_WARNING);
+	waiting	=	gbitmap_create_with_resource(RESOURCE_ID_WAITING);
+	empty	=	gbitmap_create_with_resource(RESOURCE_ID_EMPTY);
+
 	// Init fonts
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing fonts");
 	font_tiny	=	fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_12));
 	font_small	=	fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_16));
 	font_medium	=	fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_18));
 	font_large	=	fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_20));
-
 
 	// Init window
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing window");
@@ -346,40 +397,47 @@ static void init(void) {
 	Layer *root_layer = window_get_root_layer(window);
 	GRect frame = layer_get_frame(root_layer);
 
-	// Init city_layer
+	// Init city name layer
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing city layer");
 	city_layer = text_layer_create(frame);
 	text_layer_set_font(city_layer, font_large);
 	text_layer_set_text_alignment(city_layer, GTextAlignmentCenter);
 	text_layer_set_text_color(city_layer, GColorWhite);
-	text_layer_set_background_color(city_layer, GColorBlack);
+	text_layer_set_background_color(city_layer, GColorClear);
 	text_layer_set_overflow_mode(city_layer, GTextOverflowModeFill);
 	layer_add_child(root_layer, text_layer_get_layer(city_layer));
 
-	// Init desc_layer
+	// Init description layer
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing description layer");
 	desc_layer = text_layer_create(frame);
 	text_layer_set_font(desc_layer, font_small);
 	text_layer_set_text_alignment(desc_layer, GTextAlignmentCenter);
 	text_layer_set_text_color(desc_layer, GColorWhite);
-	text_layer_set_background_color(desc_layer, GColorBlack);
+	text_layer_set_background_color(desc_layer, GColorClear);
 	layer_add_child(root_layer, text_layer_get_layer(desc_layer));
 
-	// Init temp_layer
+	// Init temperature layer
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing temperature layer");
 	temp_layer = text_layer_create(frame);
 	text_layer_set_font(temp_layer, font_small);
 	text_layer_set_text_alignment(temp_layer, GTextAlignmentCenter);
 	text_layer_set_text_color(temp_layer, GColorWhite);
-	text_layer_set_background_color(temp_layer, GColorBlack);
+	text_layer_set_background_color(temp_layer, GColorClear);
 	layer_add_child(root_layer, text_layer_get_layer(temp_layer));
 
-	// Init icon_layer
+	// Init icon layer
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing icon layer");
 	icon_layer = bitmap_layer_create(frame);
 	bitmap_layer_set_background_color(icon_layer, GColorClear);
-	bitmap_layer_set_alignment(icon_layer, GAlignTop);
+	bitmap_layer_set_alignment(icon_layer, GAlignCenter);
 	layer_add_child(root_layer, bitmap_layer_get_layer(icon_layer));
+
+	// Init notification layer
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing notification layer");
+	noti_layer = bitmap_layer_create(frame);
+	bitmap_layer_set_background_color(noti_layer, GColorClear);
+	bitmap_layer_set_alignment(noti_layer, GAlignTop);
+	layer_add_child(root_layer, bitmap_layer_get_layer(noti_layer));
 
 	// Init app message and message handlers
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing handlers");
@@ -389,27 +447,30 @@ static void init(void) {
 	app_message_register_inbox_dropped(dropped_handler);
 	app_message_open(INBOUND_SIZE, OUTBOUND_SIZE);
 
-
 	// Load data from persistent storage
 	load_data();
 	// Set tick timer handler
 	tick_timer_service_subscribe(MINUTE_UNIT, &tick_handler);
-
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Finished initializing");
 }
 
 
 static void deinit(void) {
+	save_data();
 	text_layer_destroy(city_layer);
 	text_layer_destroy(temp_layer);
 	text_layer_destroy(desc_layer);
 	bitmap_layer_destroy(icon_layer);
+	bitmap_layer_destroy(noti_layer);
 	fonts_unload_custom_font(font_tiny);
 	fonts_unload_custom_font(font_small);
 	fonts_unload_custom_font(font_medium);
 	fonts_unload_custom_font(font_large);
 	if(icon != NULL)
 		gbitmap_destroy(icon);
+	gbitmap_destroy(refresh);
+	gbitmap_destroy(warning);
+	gbitmap_destroy(waiting);
+	gbitmap_destroy(empty);
 	window_destroy(window);
 }
 
