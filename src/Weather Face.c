@@ -47,9 +47,6 @@ static uint16_t padding_left	=	3; // Padding for left of screen
 static uint16_t padding_right	=	3; // Padding for right of screen
 static uint16_t padding_top		=	6; // Padding for top of screen
 static uint16_t padding_bottom	=	6; // Padding for bottom of screen
-static bool ready				=	false; // Is PebbleKit ready?
-static bool tick_timer_started	=	false; // Has the tick timer been started yet?
-static time_t last_tick_time	=	0; // Last time tick_handler ran
 
 static char city_buff[100]	=	"\0";
 static char temp_buff[50]	=	"\0";
@@ -120,7 +117,7 @@ static void set_layer_frames() {
 	uint16_t noti_w	=	20;
 	uint16_t noti_h	=	20;
 	uint16_t noti_x	=	SCR_W - (noti_w + padding_right);
-	uint16_t noti_y	=	SCR_H - (noti_h + padding_bottom);
+	uint16_t noti_y	=	SCR_H - (noti_h + temp_h + padding_bottom);
 
 	layer_set_frame(text_layer_get_layer(city_layer), GRect(city_x, city_y, city_w, city_h));
 	layer_set_bounds(text_layer_get_layer(city_layer), GRect(0, 0, city_w, city_h));
@@ -303,6 +300,15 @@ static void get_weather() {
 
 
 /**
+ * Check weather every INTERVAL minutes
+ */
+static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
+	if(time_to_refresh())
+		get_weather();
+}
+
+
+/**
  * Outgoing message sent
  */
 static void sent_handler(DictionaryIterator *sent, void *context) {
@@ -326,9 +332,9 @@ static void received_handler(DictionaryIterator *message, void *context) {
 
 	if(strcmp(status, "ready") == 0) {
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved status \"ready\"");
-		ready = true;
-		if(time_to_refresh() && tick_timer_started && time(NULL) - last_tick_time >= 30)
-			get_weather();
+
+		// Set tick timer handler
+		tick_timer_service_subscribe(MINUTE_UNIT, &tick_handler);
 	}
 
 	else if(strcmp(status, "reporting") == 0) {
@@ -365,22 +371,6 @@ static void received_handler(DictionaryIterator *message, void *context) {
  */
 static void dropped_handler(AppMessageResult reason, void *context) {
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Message dropped: %s", (char*)reason);
-}
-
-
-/**
- * Check weather every INTERVAL minutes
- */
-static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-	last_tick_time = time(NULL);
-
-	if(!tick_timer_started) {
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Tick timer started");
-		tick_timer_started = true;
-	}
-
-	if(time_to_refresh() && ready)
-		get_weather();
 }
 
 
@@ -459,8 +449,6 @@ static void init(void) {
 
 	// Load data from persistent storage
 	load_data();
-	// Set tick timer handler
-	tick_timer_service_subscribe(MINUTE_UNIT, &tick_handler);
 }
 
 
