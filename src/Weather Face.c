@@ -20,7 +20,6 @@
 
 #include <pebble.h>
 
-static const time_t INTERVAL		=	15 * 60; // Seconds between weather checks
 static const time_t ERROR_TIMEOUT	=	120; // Wait time after error before retrying get_weather
 static const uint32_t INBOUND_SIZE	=	128; // Inbound app message size
 static const uint32_t OUTBOUND_SIZE	=	128; // Outbound app message size
@@ -33,6 +32,7 @@ static TextLayer *temp_layer;
 static TextLayer *desc_layer;
 static BitmapLayer *icon_layer;
 static BitmapLayer *noti_layer;
+static InverterLayer *invert_layer;
 static GFont font_tiny;
 static GFont font_small;
 static GFont font_medium;
@@ -53,6 +53,9 @@ static char temp_buff[50]	=	"\0";
 static char desc_buff[50]	=	"\0";
 static char icon_buff[50]	=	"\0";
 static time_t time_stamp	=	0;
+static time_t timeout		=	-1; // Seconds between weather checks
+static uint8_t theme		=	0; // 1 for "white on black" and 2 for "black on white"
+static bool getting_weather	=	false; // Used to keep get_weather from running twice
 
 enum dict_keys {
 	STATUS,
@@ -60,19 +63,60 @@ enum dict_keys {
 	TEMP,
 	DESC,
 	ICON,
-	TIME
+	THEME,
+	TIMEOUT,
+	TIME_STAMP
 };
 
 
 /**
- * Compare time stamp of last refresh to current time, if INTERVAL has been reached return true, if
+ * Recieves char '0' to '9' and returns int 0 to 9
+ */
+static int char_to_int(char c) {
+	switch(c) {
+		case '0': return 0;
+		case '1': return 1;
+		case '2': return 2;
+		case '3': return 3;
+		case '4': return 4;
+		case '5': return 5;
+		case '6': return 6;
+		case '7': return 7;
+		case '8': return 8;
+		case '9': return 9;
+		default: return -1;
+	}
+}
+
+
+/**
+ * Recieves number in cstring form, and the number of decimal places in the number.
+ * Returns integer version.
+ */
+static int str_to_int(char *str, int dec_places) {
+	int num = 0;
+
+	while(*str != '\0') {
+		int cur_dec = 1;
+
+		while(dec_places-- > 1)
+			cur_dec *= 10;
+
+		num += cur_dec * char_to_int(*str++);
+	}
+
+	return num;
+}
+
+
+/**
+ * Compare time stamp of last refresh to current time, if interval has been reached return true, if
  * not, or no time stamp exists, then return false
  */
 static bool time_to_refresh() {
 	time_t time_passed = time(NULL) - time_stamp;
-	if(time_stamp == 0 || time_passed >= INTERVAL) {
+	if(time_stamp == 0 || time_passed >= timeout) {
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Time to refresh");
-		bitmap_layer_set_bitmap(noti_layer, waiting);
 		return true;
 	}
 
@@ -80,7 +124,7 @@ static bool time_to_refresh() {
 		APP_LOG(
 			APP_LOG_LEVEL_DEBUG,
 			"Not time to refresh, %d seconds left",
-			(int)(INTERVAL - time_passed)
+			(int)(timeout - time_passed)
 		);
 
 		return false;
@@ -212,11 +256,13 @@ static void set_layer_values() {
  */
 static bool data_to_save() {
 	return (
-		city_buff[0] != '\0' &&
-		temp_buff[0] != '\0' &&
-		desc_buff[0] != '\0' &&
-		icon_buff[0] != '\0' &&
-		time_stamp != 0
+		city_buff[0]	!=	'\0' &&
+		temp_buff[0]	!=	'\0' &&
+		desc_buff[0]	!=	'\0' &&
+		icon_buff[0]	!=	'\0' &&
+		time_stamp		!=	0 &&
+		timeout			!=	-1 &&
+		theme			!=	0
 	);
 }
 
@@ -230,7 +276,9 @@ static bool data_to_load() {
 		persist_exists(TEMP) &&
 		persist_exists(DESC) &&
 		persist_exists(ICON) &&
-		persist_exists(TIME)
+		persist_exists(THEME) &&
+		persist_exists(TIMEOUT) &&
+		persist_exists(TIME_STAMP)
 	);
 }
 
@@ -246,7 +294,9 @@ static void save_data() {
 		persist_write_string(TEMP, temp_buff);
 		persist_write_string(DESC, desc_buff);
 		persist_write_string(ICON, icon_buff);
-		persist_write_int(TIME, (int)time_stamp);
+		persist_write_int(THEME, theme);
+		persist_write_int(TIMEOUT, timeout);
+		persist_write_int(TIME_STAMP, time_stamp);
 	}
 
 	else
@@ -266,7 +316,9 @@ static void load_data() {
 		persist_read_string(TEMP, temp_buff, 50);
 		persist_read_string(DESC, desc_buff, 50);
 		persist_read_string(ICON, icon_buff, 50);
-		time_stamp = (time_t)persist_read_int(TIME);
+		theme		=	(uint8_t)persist_read_int(THEME);
+		timeout		=	(time_t)persist_read_int(TIMEOUT);
+		time_stamp	=	(time_t)persist_read_int(TIME_STAMP);
 
 		set_layer_values();
 	}
@@ -274,9 +326,18 @@ static void load_data() {
 	// Else set text to "loading..." and set layer frames
 	else {
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Some or all save data is empty, not loading");
+		theme = 1;
+		timeout = 900;
 		text_layer_set_text(city_layer, "loading...");
 		set_layer_frames();
 	}
+
+	// Hide or show invert_layer
+	if(theme == 1)
+		layer_set_hidden(inverter_layer_get_layer(invert_layer), true);
+
+	else if(theme == 2)
+		layer_set_hidden(inverter_layer_get_layer(invert_layer), false);
 }
 
 
@@ -284,23 +345,27 @@ static void load_data() {
  * Send signal to Javascript to check the weather
  */
 static void get_weather() {
-	// Reset time_stamp back to INTERVAL to avoid simultanious runs of get_weather
-	time_stamp = time(NULL) - INTERVAL;
+	if(!getting_weather) {
+		getting_weather = true;
 
-	bitmap_layer_set_bitmap(noti_layer, refresh);
+		// Reset time_stamp back to interval to avoid simultanious runs of get_weather
+		time_stamp = time(NULL) - timeout;
 
-	DictionaryIterator *iter;
-	app_message_outbox_begin(&iter);
+		bitmap_layer_set_bitmap(noti_layer, refresh);
 
-	Tuplet value = TupletCString(STATUS, "retrieve");
-	dict_write_tuplet(iter, &value);
+		DictionaryIterator *iter;
+		app_message_outbox_begin(&iter);
 
-	app_message_outbox_send();
+		Tuplet value = TupletCString(STATUS, "retrieve");
+		dict_write_tuplet(iter, &value);
+
+		app_message_outbox_send();
+	}
 }
 
 
 /**
- * Check weather every INTERVAL minutes
+ * Check weather every interval minutes
  */
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 	if(time_to_refresh())
@@ -333,12 +398,16 @@ static void received_handler(DictionaryIterator *message, void *context) {
 	if(strcmp(status, "ready") == 0) {
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved status \"ready\"");
 
+		bitmap_layer_set_bitmap(noti_layer, empty);
+
 		// Set tick timer handler
 		tick_timer_service_subscribe(MINUTE_UNIT, &tick_handler);
 	}
 
 	else if(strcmp(status, "reporting") == 0) {
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved status \"reporting\"");
+
+		getting_weather = false;
 
 		// Set notification area to empty bitmap
 		bitmap_layer_set_bitmap(noti_layer, empty);
@@ -356,12 +425,24 @@ static void received_handler(DictionaryIterator *message, void *context) {
 	else if(strcmp(status, "configUpdated") == 0) {
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Recieved status \"configUpdate\"");
 
+		Tuple *theme_tup	=	dict_find(message, THEME);
+		Tuple *timeout_tup	=	dict_find(message, TIMEOUT);
+		theme				=	(uint8_t)str_to_int((char*)theme_tup->value, theme_tup->length - 1);
+		timeout				=	(time_t)str_to_int((char*)timeout_tup->value, timeout_tup->length - 1);
+
+		// Hide or show invert_layer
+		if(theme == 1)
+			layer_set_hidden(inverter_layer_get_layer(invert_layer), true);
+
+		else if(theme == 2)
+			layer_set_hidden(inverter_layer_get_layer(invert_layer), false);
+
 		get_weather();
 	}
 
 	else if(strcmp(status, "failed") == 0) {
 		bitmap_layer_set_bitmap(noti_layer, warning);
-		time_stamp = time(NULL) - (INTERVAL - ERROR_TIMEOUT);
+		time_stamp = time(NULL) - (timeout - ERROR_TIMEOUT);
 	}
 }
 
@@ -439,6 +520,12 @@ static void init(void) {
 	bitmap_layer_set_alignment(noti_layer, GAlignTop);
 	layer_add_child(root_layer, bitmap_layer_get_layer(noti_layer));
 
+	// Init invert layer
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing invert layer");
+	invert_layer = inverter_layer_create(frame);
+	layer_set_frame(inverter_layer_get_layer(invert_layer), GRect(0, 0, SCR_W, SCR_H));
+	layer_add_child(root_layer, inverter_layer_get_layer(invert_layer));
+
 	// Init app message and message handlers
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Initializing handlers");
 	app_message_register_outbox_sent(sent_handler);
@@ -446,6 +533,8 @@ static void init(void) {
 	app_message_register_inbox_received(received_handler);
 	app_message_register_inbox_dropped(dropped_handler);
 	app_message_open(INBOUND_SIZE, OUTBOUND_SIZE);
+
+	bitmap_layer_set_bitmap(noti_layer, waiting);
 
 	// Load data from persistent storage
 	load_data();
@@ -459,6 +548,7 @@ static void deinit(void) {
 	text_layer_destroy(desc_layer);
 	bitmap_layer_destroy(icon_layer);
 	bitmap_layer_destroy(noti_layer);
+	inverter_layer_destroy(invert_layer);
 	fonts_unload_custom_font(font_tiny);
 	fonts_unload_custom_font(font_small);
 	fonts_unload_custom_font(font_medium);

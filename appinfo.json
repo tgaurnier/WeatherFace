@@ -12,7 +12,9 @@
 		"city": 1,
 		"temp": 2,
 		"desc": 3,
-		"icon": 4
+		"icon": 4,
+		"theme": 5,
+		"timeout": 6
 	},
 	"resources": {
 		"media": [
