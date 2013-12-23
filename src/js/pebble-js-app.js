@@ -52,10 +52,10 @@ function createJSONArray() {
 		"title": "Units of measurement",
 		"list": [
 			{
-				"value": "Celcius",
-				"text": "Celcius",
-				"id": "Celcius",
-				"selected": (unit == "Celcius")
+				"value": "Celsius",
+				"text": "Celsius",
+				"id": "Celsius",
+				"selected": (unit == "Celsius")
 			},
 			{
 				"value": "Fahrenheit",
