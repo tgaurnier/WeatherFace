@@ -156,7 +156,7 @@ function showConfigWindow(e) {
 	var url	=	"https://rawgithub.com/tgaurnier/PebbleGlobalConfig/master/configuration.html?";
 	for(i = 0; i < objects.length; i++) {
 		if(i > 0) url += "&";
-		url += i + "=" + JSON.stringify(objects[i]);
+		url += i + "=" + encodeURIComponent(JSON.stringify(objects[i]));
 	}
 
 	console.log("Showing config page: " + url);
