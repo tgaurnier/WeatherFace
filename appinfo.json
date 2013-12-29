@@ -4,7 +4,7 @@
 	"longName": "Weather Face",
 	"companyName": "Tory Gaurnier",
 	"versionCode": 1,
-	"versionLabel": "1.0.6",
+	"versionLabel": "1.0.7",
 	"watchapp": { "watchface": true },
 	"capabilities": [ "location", "configurable" ],
 	"appKeys": {
